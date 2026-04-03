@@ -95,6 +95,13 @@
             padding: 18px 20px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
             position: relative;
+            transition: opacity 0.3s;
+        }
+
+        /* Too far in the past style */
+        .date-card.old-archive {
+            opacity: 0.4;
+            transform: scale(0.98);
         }
 
         .region-label {
@@ -215,13 +222,11 @@
 
         let nums = val.match(/\d+/g);
         
-        // Handle raw string of numbers (6 or 8 digits)
         if (nums && nums.length === 1) {
             const raw = nums[0];
             if (raw.length === 6) {
                 nums = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 6)];
             } else if (raw.length === 8) {
-                // Try both MMDDYYYY and YYYYMMDD
                 const d1 = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 8)];
                 const d2 = [raw.substring(0, 4), raw.substring(4, 6), raw.substring(6, 8)];
                 processMultiNumbers([d1, d2]);
@@ -243,7 +248,6 @@
         sets.forEach(nums => {
             allPossibilities = allPossibilities.concat(getPossibilities(nums.map(n => parseInt(n, 10))));
         });
-        // Remove duplicates and render
         const unique = Array.from(new Set(allPossibilities.map(p => p.date.getTime())))
             .map(t => allPossibilities.find(p => p.date.getTime() === t));
         renderResults(unique);
@@ -254,7 +258,6 @@
         today.setHours(0, 0, 0, 0);
         const currentYear2 = today.getFullYear() % 100;
 
-        // If only 2 numbers, assume current year
         if (parts.length === 2) parts.push(currentYear2);
 
         const formats = [
@@ -273,7 +276,6 @@
 
             if (isNaN(d) || isNaN(m) || isNaN(y)) return;
 
-            // Year normalization
             if (y < 100) {
                 y += (y < 80 ? 2000 : 1900);
             }
@@ -289,7 +291,6 @@
             }
         });
 
-        // Specific check for YYYY MM DD if first part is 4 digits
         if (parts[0] > 1900 && parts[0] < 2100 && parts.length === 3) {
             const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
             if (dateObj.getFullYear() === parts[0] && dateObj.getMonth() === parts[1]-1 && dateObj.getDate() === parts[2]) {
@@ -301,7 +302,16 @@
             }
         }
 
-        return results.sort((a, b) => Math.abs(a.date - today) - Math.abs(b.date - today));
+        // Sorting Logic: Priority to non-archive dates, then distance to today
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+        return results.sort((a, b) => {
+            const aOld = a.date < oneYearAgo;
+            const bOld = b.date < oneYearAgo;
+            if (aOld !== bOld) return aOld ? 1 : -1;
+            return Math.abs(a.date - today) - Math.abs(b.date - today);
+        });
     }
 
     function renderResults(list) {
@@ -312,11 +322,14 @@
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
 
         resultList.innerHTML = '';
         list.forEach(item => {
             const diff = Math.ceil((item.date - today) / (1000 * 60 * 60 * 24));
             const statusColor = getStatusColor(diff);
+            const isArchive = item.date < oneYearAgo;
             
             let timeText = "";
             if (diff < 0) {
@@ -328,10 +341,10 @@
             }
 
             const card = document.createElement('div');
-            card.className = 'date-card';
+            card.className = `date-card ${isArchive ? 'old-archive' : ''}`;
             card.style.borderLeft = `6px solid ${statusColor}`;
             card.innerHTML = `
-                <span class="region-label">${item.label}</span>
+                <span class="region-label">${item.label}${isArchive ? ' (Archive)' : ''}</span>
                 <span class="date-display">${formatFullDate(item.date)}</span>
                 <div class="relative-time">
                     <span class="status-dot" style="background: ${statusColor}"></span>
@@ -343,9 +356,9 @@
     }
 
     function getStatusColor(diff) {
-        if (diff < 0) return "#f44336"; // danger
-        if (diff <= 7) return "#ff9800"; // warn
-        return "#4CAF50"; // safe
+        if (diff < 0) return "#f44336"; 
+        if (diff <= 7) return "#ff9800"; 
+        return "#4CAF50"; 
     }
 
     function formatFullDate(d) {
