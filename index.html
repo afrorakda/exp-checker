@@ -18,6 +18,7 @@
             --safe: #4CAF50;
             --warn: #ff9800;
             --danger: #f44336;
+            --text-sub: #666;
         }
 
         body {
@@ -94,7 +95,6 @@
             padding: 18px 20px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
             position: relative;
-            overflow: hidden;
         }
 
         .region-label {
@@ -117,9 +117,10 @@
         .relative-time {
             font-size: 0.9rem;
             font-weight: 600;
+            color: var(--text-sub);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
         .status-dot {
@@ -134,6 +135,7 @@
             color: #bbb;
             font-size: 0.9rem;
             font-weight: 500;
+            text-align: center;
         }
 
         footer { margin-top: 50px; font-size: 11px; color: #aaa; line-height: 1.8; }
@@ -168,7 +170,7 @@
     <p class="subtitle">Decipher expiry dates by "time distance".</p>
 
     <div class="search-container">
-        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 04/05/26" oninput="handleInput()" autofocus>
+        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 040526 or 04/05/26" oninput="handleInput()" autofocus>
         <button class="clear-btn" id="clearBtn" onclick="clearInput()">clr</button>
     </div>
 
@@ -203,26 +205,39 @@
     const clearBtn = document.getElementById('clearBtn');
 
     function handleInput() {
-        const val = dateInput.value;
+        const val = dateInput.value.replace(/[^0-9/- .]/g, '');
         clearBtn.classList.toggle('active', val.length > 0);
         
-        const nums = val.match(/\d+/g);
+        let nums = val.match(/\d+/g);
+        
+        // Handle raw numbers without delimiters (e.g., 040526)
+        if (nums && nums.length === 1 && (nums[0].length === 6 || nums[0].length === 8)) {
+            const raw = nums[0];
+            if (raw.length === 6) {
+                nums = [raw.substring(0,2), raw.substring(2,4), raw.substring(4,6)];
+            } else {
+                nums = [raw.substring(0,2), raw.substring(2,4), raw.substring(4,8)];
+                // Also check if it's YYYYMMDD
+                const altNums = [raw.substring(0,4), raw.substring(4,6), raw.substring(6,8)];
+                // We'll process the most likely one in the logic below
+            }
+        }
+
         if (!nums || nums.length < 2) {
             resultList.innerHTML = '<div class="empty-state">Enter at least 2 numbers...</div>';
             return;
         }
 
-        const possibilities = getPossibilities(nums);
+        const possibilities = getPossibilities(nums.map(n => parseInt(n, 10)));
         renderResults(possibilities);
     }
 
-    function getPossibilities(nums) {
-        // Normalize numbers to integers
-        let parts = nums.map(n => parseInt(n, 10));
-        if (parts.length === 2) parts.push(new Date().getFullYear() % 100); // Default to current year if 2 numbers
-
+    function getPossibilities(parts) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const currentYear2 = today.getFullYear() % 100;
+
+        if (parts.length === 2) parts.push(currentYear2);
 
         const formats = [
             { label: "UK / Asia / Europe (DMY)", p: [0, 1, 2] },
@@ -238,25 +253,36 @@
             let m = parts[f.p[1]];
             let y = parts[f.p[2]];
 
-            // Year normalization (2 digits to 4)
-            if (y < 100) y += (y < 50 ? 2000 : 1900);
+            // Year normalization with Heuristics
+            if (y < 100) {
+                // If y is close to current year, assume 20xx
+                y += (y < 80 ? 2000 : 1900);
+            }
 
             const dateObj = new Date(y, m - 1, d);
             
-            // Validate if it's a real date
             if (dateObj.getFullYear() === y && dateObj.getMonth() === m - 1 && dateObj.getDate() === d) {
                 const key = dateObj.getTime();
                 if (!seen.has(key)) {
-                    results.push({
-                        date: dateObj,
-                        label: f.label
-                    });
+                    results.push({ date: dateObj, label: f.label });
                     seen.add(key);
                 }
             }
         });
 
-        return results.sort((a, b) => a.date - b.date);
+        // Special check for YYYYMMDD if a 4-digit number exists at index 0
+        if (parts[0] > 1900 && parts[0] < 2100 && parts.length === 3) {
+             const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+             if (dateObj.getFullYear() === parts[0] && dateObj.getMonth() === parts[1]-1 && dateObj.getDate() === parts[2]) {
+                const key = dateObj.getTime();
+                if (!seen.has(key)) {
+                    results.push({ date: dateObj, label: "ISO (YMD)" });
+                    seen.add(key);
+                }
+             }
+        }
+
+        return results.sort((a, b) => Math.abs(a.date - today) - Math.abs(b.date - today));
     }
 
     function renderResults(list) {
@@ -271,18 +297,13 @@
         resultList.innerHTML = '';
         list.forEach(item => {
             const diff = Math.ceil((item.date - today) / (1000 * 60 * 60 * 24));
-            let statusColor = varName('--safe');
+            const statusColor = getStatusColor(diff);
+            
             let timeText = "";
-
             if (diff < 0) {
-                statusColor = varName('--danger');
                 timeText = `${Math.abs(diff)} days ago (Expired)`;
             } else if (diff === 0) {
-                statusColor = varName('--warn');
                 timeText = "Expires Today";
-            } else if (diff <= 7) {
-                statusColor = varName('--warn');
-                timeText = `In ${diff} days`;
             } else {
                 timeText = `In ${diff} days`;
             }
@@ -293,7 +314,7 @@
             card.innerHTML = `
                 <span class="region-label">${item.label}</span>
                 <span class="date-display">${formatFullDate(item.date)}</span>
-                <div class="relative-time" style="color: ${statusColor}">
+                <div class="relative-time">
                     <span class="status-dot" style="background: ${statusColor}"></span>
                     ${timeText}
                 </div>
@@ -302,14 +323,17 @@
         });
     }
 
+    function getStatusColor(diff) {
+        const root = getComputedStyle(document.documentElement);
+        if (diff < 0) return root.getPropertyValue('--danger').trim();
+        if (diff <= 7) return root.getPropertyValue('--warn').trim();
+        return root.getPropertyValue('--safe').trim();
+    }
+
     function formatFullDate(d) {
         const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} (${days[d.getDay()]})`;
-    }
-
-    function varName(name) {
-        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     }
 
     function clearInput() {
