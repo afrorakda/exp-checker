@@ -205,21 +205,27 @@
     const clearBtn = document.getElementById('clearBtn');
 
     function handleInput() {
-        const val = dateInput.value.replace(/[^0-9/- .]/g, '');
+        const val = dateInput.value;
         clearBtn.classList.toggle('active', val.length > 0);
         
+        if (!val.trim()) {
+            resultList.innerHTML = '<div class="empty-state">Enter a date to see possibilities...</div>';
+            return;
+        }
+
         let nums = val.match(/\d+/g);
         
-        // Handle raw numbers without delimiters (e.g., 040526)
-        if (nums && nums.length === 1 && (nums[0].length === 6 || nums[0].length === 8)) {
+        // Handle raw string of numbers (6 or 8 digits)
+        if (nums && nums.length === 1) {
             const raw = nums[0];
             if (raw.length === 6) {
-                nums = [raw.substring(0,2), raw.substring(2,4), raw.substring(4,6)];
-            } else {
-                nums = [raw.substring(0,2), raw.substring(2,4), raw.substring(4,8)];
-                // Also check if it's YYYYMMDD
-                const altNums = [raw.substring(0,4), raw.substring(4,6), raw.substring(6,8)];
-                // We'll process the most likely one in the logic below
+                nums = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 6)];
+            } else if (raw.length === 8) {
+                // Try both MMDDYYYY and YYYYMMDD
+                const d1 = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 8)];
+                const d2 = [raw.substring(0, 4), raw.substring(4, 6), raw.substring(6, 8)];
+                processMultiNumbers([d1, d2]);
+                return;
             }
         }
 
@@ -232,11 +238,23 @@
         renderResults(possibilities);
     }
 
+    function processMultiNumbers(sets) {
+        let allPossibilities = [];
+        sets.forEach(nums => {
+            allPossibilities = allPossibilities.concat(getPossibilities(nums.map(n => parseInt(n, 10))));
+        });
+        // Remove duplicates and render
+        const unique = Array.from(new Set(allPossibilities.map(p => p.date.getTime())))
+            .map(t => allPossibilities.find(p => p.date.getTime() === t));
+        renderResults(unique);
+    }
+
     function getPossibilities(parts) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const currentYear2 = today.getFullYear() % 100;
 
+        // If only 2 numbers, assume current year
         if (parts.length === 2) parts.push(currentYear2);
 
         const formats = [
@@ -253,9 +271,10 @@
             let m = parts[f.p[1]];
             let y = parts[f.p[2]];
 
-            // Year normalization with Heuristics
+            if (isNaN(d) || isNaN(m) || isNaN(y)) return;
+
+            // Year normalization
             if (y < 100) {
-                // If y is close to current year, assume 20xx
                 y += (y < 80 ? 2000 : 1900);
             }
 
@@ -270,16 +289,16 @@
             }
         });
 
-        // Special check for YYYYMMDD if a 4-digit number exists at index 0
+        // Specific check for YYYY MM DD if first part is 4 digits
         if (parts[0] > 1900 && parts[0] < 2100 && parts.length === 3) {
-             const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
-             if (dateObj.getFullYear() === parts[0] && dateObj.getMonth() === parts[1]-1 && dateObj.getDate() === parts[2]) {
+            const dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+            if (dateObj.getFullYear() === parts[0] && dateObj.getMonth() === parts[1]-1 && dateObj.getDate() === parts[2]) {
                 const key = dateObj.getTime();
                 if (!seen.has(key)) {
                     results.push({ date: dateObj, label: "ISO (YMD)" });
                     seen.add(key);
                 }
-             }
+            }
         }
 
         return results.sort((a, b) => Math.abs(a.date - today) - Math.abs(b.date - today));
@@ -324,10 +343,9 @@
     }
 
     function getStatusColor(diff) {
-        const root = getComputedStyle(document.documentElement);
-        if (diff < 0) return root.getPropertyValue('--danger').trim();
-        if (diff <= 7) return root.getPropertyValue('--warn').trim();
-        return root.getPropertyValue('--safe').trim();
+        if (diff < 0) return "#f44336"; // danger
+        if (diff <= 7) return "#ff9800"; // warn
+        return "#4CAF50"; // safe
     }
 
     function formatFullDate(d) {
