@@ -44,6 +44,8 @@
         .subtitle { font-size: 0.85rem; color: #999; font-weight: 700; margin-bottom: 30px; text-align: left; }
 
         .search-container { position: relative; margin-bottom: 25px; }
+        
+        /* 修正：記号が打てるキーボードへの対応 */
         .search-box {
             width: 100%; padding: 18px; padding-right: 65px; border: 2px solid var(--accent); border-radius: var(--radius);
             background: var(--input-bg); font-size: 1.2rem; font-weight: 800; color: var(--main) !important;
@@ -114,7 +116,7 @@
     <p class="subtitle">Caution: Shortest remaining time is priority.</p>
 
     <div class="search-container">
-        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 120526" oninput="handleInput()" autofocus inputmode="numeric">
+        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 12/05/26" oninput="handleInput()" autofocus inputmode="decimal">
         <button class="clear-btn" id="clearBtn" onclick="clearInput()">×</button>
     </div>
 
@@ -179,7 +181,6 @@
 
     function getPossibilities(parts) {
         const today = new Date(); today.setHours(0,0,0,0);
-        // 2要素（例: 04/05）なら今年の年を補完
         if (parts.length === 2) parts.push(today.getFullYear() % 100);
         const formats = [
             { l: "Asia / EU style (DMY)", p: [0, 1, 2] },
@@ -218,7 +219,6 @@
             const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
             const formatted = `${mon[item.date.getMonth()]} ${item.date.getDate()}, ${item.date.getFullYear()} (${day[item.date.getDay()]})`;
             
-            // 最優先（最短）タグの色を動的に変更
             const tagBg = idx === 0 ? statusColor : "var(--main)";
             const tagText = idx === 0 ? "Shortest Time (Check First)" : "";
 
@@ -230,7 +230,7 @@
                     <span class="status-dot" style="background: ${statusColor}"></span>
                     ${diff < 0 ? Math.abs(diff) + ' days ago (Expired)' : (diff === 0 ? 'Expires Today' : 'In ' + diff + ' days')}
                 </div>
-            `;
+            `;い
             resultList.appendChild(card);
         });
     }
