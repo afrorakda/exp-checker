@@ -59,7 +59,6 @@
             background: var(--accent);
             padding: 8px 14px;
             border-radius: 12px;
-            transition: opacity 0.2s;
         }
 
         .subtitle { font-size: 0.85rem; color: #999; font-weight: 700; margin-bottom: 30px; text-align: left; }
@@ -101,8 +100,7 @@
             font-weight: bold;
             cursor: pointer;
             display: none;
-            align-items: center;
-            justify-content: center;
+            align-items: center; justify-content: center;
         }
         .clear-btn.active { display: flex; }
 
@@ -110,7 +108,6 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            text-align: left;
         }
 
         .date-card {
@@ -120,9 +117,26 @@
             padding: 18px 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.03);
             position: relative;
+            transition: transform 0.2s;
         }
 
-        .date-card.old-archive { opacity: 0.5; transform: scale(0.98); }
+        /* 最短期限（一番注意すべきカード）のスタイル */
+        .date-card.priority {
+            border: 2px solid #ddd;
+            background: #fdfdfd;
+        }
+
+        .card-tag {
+            display: inline-block;
+            background: #333;
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
 
         .region-label {
             font-size: 0.65rem;
@@ -130,20 +144,19 @@
             color: #aaa;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 6px;
-            display: block;
+            margin-bottom: 4px;
         }
 
         .date-display {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 900;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             display: block;
         }
 
         .relative-time {
             font-size: 0.9rem;
-            font-weight: 700;
+            font-weight: 800;
             color: var(--text-sub);
             display: flex;
             align-items: center;
@@ -158,11 +171,8 @@
             font-size: 0.95rem;
             font-weight: 700;
             text-align: center;
-            border: 2px dashed var(--accent);
-            border-radius: var(--radius);
         }
 
-        /* Footer & Buttons */
         .footer-btns { margin-top: auto; padding: 40px 0 20px; text-align: center; }
         .kofi-btn {
             display: inline-flex; align-items: center; justify-content: center;
@@ -200,15 +210,15 @@
         <h1>EXP Checker</h1>
         <a href="https://afrorakda.github.io/" class="hub-link">🏠 Hub</a>
     </header>
-    <p class="subtitle">Decipher expiry dates by "time distance".</p>
+    <p class="subtitle">Sorting by shortest remaining time.</p>
 
     <div class="search-container">
-        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 040526 or 04/05/26" oninput="handleInput()" autofocus inputmode="numeric">
+        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 120526" oninput="handleInput()" autofocus inputmode="numeric">
         <button class="clear-btn" id="clearBtn" onclick="clearInput()">×</button>
     </div>
 
     <div class="result-list" id="resultList">
-        <div class="empty-state">Enter a date to see possibilities...</div>
+        <div class="empty-state">Decipher expiry dates by "risk distance".</div>
     </div>
 
     <div class="footer-btns">
@@ -242,92 +252,55 @@
     function handleInput() {
         const val = dateInput.value;
         clearBtn.classList.toggle('active', val.length > 0);
-        
         if (!val.trim()) {
-            resultList.innerHTML = '<div class="empty-state">Enter a date to see possibilities...</div>';
+            resultList.innerHTML = '<div class="empty-state">Decipher expiry dates by "risk distance".</div>';
             return;
         }
-
         let nums = val.match(/\d+/g);
-        
         if (nums && nums.length === 1) {
-            const raw = nums[0];
-            if (raw.length === 6) {
-                nums = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 6)];
-            } else if (raw.length === 8) {
-                const d1 = [raw.substring(0, 2), raw.substring(2, 4), raw.substring(4, 8)];
-                const d2 = [raw.substring(0, 4), raw.substring(4, 6), raw.substring(6, 8)];
-                processMultiNumbers([d1, d2]);
-                return;
+            const r = nums[0];
+            if (r.length === 6) nums = [r.substring(0, 2), r.substring(2, 4), r.substring(4, 6)];
+            else if (r.length === 8) {
+                const s1 = [r.substring(0, 2), r.substring(2, 4), r.substring(4, 8)];
+                const s2 = [r.substring(0, 4), r.substring(4, 6), r.substring(6, 8)];
+                renderResults(getUnique([s1, s2])); return;
             }
         }
-
         if (!nums || nums.length < 2) {
             resultList.innerHTML = '<div class="empty-state">Enter at least 2 numbers...</div>';
             return;
         }
-
-        const possibilities = getPossibilities(nums.map(n => parseInt(n, 10)));
-        renderResults(possibilities);
+        renderResults(getPossibilities(nums.map(n => parseInt(n, 10))));
     }
 
-    function processMultiNumbers(sets) {
-        let allPossibilities = [];
-        sets.forEach(nums => {
-            allPossibilities = allPossibilities.concat(getPossibilities(nums.map(n => parseInt(n, 10))));
-        });
-        const unique = Array.from(new Set(allPossibilities.map(p => p.date.getTime())))
-            .map(t => allPossibilities.find(p => p.date.getTime() === t));
-        renderResults(unique);
+    function getUnique(sets) {
+        let all = [];
+        sets.forEach(s => { all = all.concat(getPossibilities(s.map(n => parseInt(n, 10)))); });
+        const seen = new Set();
+        return all.filter(p => { const k = p.date.getTime(); return seen.has(k) ? false : seen.add(k); });
     }
 
     function getPossibilities(parts) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const currentYear2 = today.getFullYear() % 100;
-
-        if (parts.length === 2) parts.push(currentYear2);
-
+        const today = new Date(); today.setHours(0,0,0,0);
+        if (parts.length === 2) parts.push(today.getFullYear() % 100);
         const formats = [
-            { label: "DMY Style", p: [0, 1, 2] },
-            { label: "MDY Style", p: [1, 0, 2] },
-            { label: "YMD Style", p: [2, 1, 0] }
+            { l: "Asia / EU style (DMY)", p: [0, 1, 2] },
+            { l: "USA style (MDY)", p: [1, 0, 2] },
+            { l: "ISO style (YMD)", p: [2, 1, 0] }
         ];
-
-        let results = [];
-        let seen = new Set();
-
+        let res = []; let seen = new Set();
         formats.forEach(f => {
-            let d = parts[f.p[0]];
-            let m = parts[f.p[1]];
-            let y = parts[f.p[2]];
-
+            let d = parts[f.p[0]], m = parts[f.p[1]], y = parts[f.p[2]];
             if (isNaN(d) || isNaN(m) || isNaN(y)) return;
-
-            if (y < 100) {
-                y += (y < 80 ? 2000 : 1900);
-            }
-
-            const dateObj = new Date(y, m - 1, d);
-            
-            if (dateObj.getFullYear() === y && dateObj.getMonth() === m - 1 && dateObj.getDate() === d) {
-                const key = dateObj.getTime();
-                if (!seen.has(key)) {
-                    results.push({ date: dateObj, label: f.label });
-                    seen.add(key);
-                }
+            if (y < 100) y += (y < 80 ? 2000 : 1900);
+            const dobj = new Date(y, m - 1, d);
+            if (dobj.getFullYear() === y && dobj.getMonth() === m - 1 && dobj.getDate() === d) {
+                const k = dobj.getTime();
+                if (!seen.has(k)) { res.push({ date: dobj, label: f.l }); seen.add(k); }
             }
         });
-
-        const oneYearAgo = new Date(today);
-        oneYearAgo.setFullYear(today.getFullYear() - 1);
-
-        return results.sort((a, b) => {
-            const aOld = a.date < oneYearAgo;
-            const bOld = b.date < oneYearAgo;
-            if (aOld !== bOld) return aOld ? 1 : -1;
-            return Math.abs(a.date - today) - Math.abs(b.date - today);
-        });
+        // Risk Sorting: Shortest remaining time (including expired) comes first
+        return res.sort((a, b) => a.date - b.date);
     }
 
     function renderResults(list) {
@@ -335,65 +308,36 @@
             resultList.innerHTML = '<div class="empty-state">No valid date found.</div>';
             return;
         }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const oneYearAgo = new Date(today);
-        oneYearAgo.setFullYear(today.getFullYear() - 1);
-
+        const today = new Date(); today.setHours(0,0,0,0);
         resultList.innerHTML = '';
-        list.forEach(item => {
+        list.forEach((item, idx) => {
             const diff = Math.ceil((item.date - today) / (1000 * 60 * 60 * 24));
-            const statusColor = getStatusColor(diff);
-            const isArchive = item.date < oneYearAgo;
-            
-            let timeText = "";
-            if (diff < 0) {
-                timeText = `${Math.abs(diff)} days ago (Expired)`;
-            } else if (diff === 0) {
-                timeText = "Expires Today";
-            } else {
-                timeText = `In ${diff} days`;
-            }
-
+            const statusColor = diff < 0 ? "#f44336" : (diff <= 7 ? "#ff9800" : "#4CAF50");
             const card = document.createElement('div');
-            card.className = `date-card ${isArchive ? 'old-archive' : ''}`;
+            card.className = `date-card ${idx === 0 ? 'priority' : ''}`;
             card.style.borderLeft = `6px solid ${statusColor}`;
+            
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const formatted = `${monthNames[item.date.getMonth()]} ${item.date.getDate()}, ${item.date.getFullYear()} (${dayNames[item.date.getDay()]})`;
+            
             card.innerHTML = `
-                <span class="region-label">${item.label}${isArchive ? ' (Archive)' : ''}</span>
-                <span class="date-display">${formatFullDate(item.date)}</span>
+                ${idx === 0 ? '<span class="card-tag">Shortest Time (Priority)</span>' : ''}
+                <div class="region-label">${item.label}</div>
+                <span class="date-display">${formatted}</span>
                 <div class="relative-time">
                     <span class="status-dot" style="background: ${statusColor}"></span>
-                    ${timeText}
+                    ${diff < 0 ? Math.abs(diff) + ' days ago (Expired)' : (diff === 0 ? 'Expires Today' : 'In ' + diff + ' days')}
                 </div>
             `;
             resultList.appendChild(card);
         });
     }
 
-    function getStatusColor(diff) {
-        if (diff < 0) return "#f44336"; 
-        if (diff <= 7) return "#ff9800"; 
-        return "#4CAF50"; 
-    }
-
-    function formatFullDate(d) {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} (${days[d.getDay()]})`;
-    }
-
-    function clearInput() {
-        dateInput.value = '';
-        clearBtn.classList.remove('active');
-        dateInput.focus();
-        handleInput();
-    }
-
+    function clearInput() { dateInput.value = ''; clearBtn.classList.remove('active'); dateInput.focus(); handleInput(); }
     function showModal() { document.getElementById('modal').style.display = 'flex'; }
     function hideModal() { document.getElementById('modal').style.display = 'none'; }
 
-    // Load dynamic footer logic (Supplementary only)
     async function loadFooter() {
         try {
             const res = await fetch('footer.json');
@@ -401,9 +345,7 @@
                 const data = await res.json();
                 if (data.footerHtml) document.getElementById('dynamicFooter').innerHTML = data.footerHtml;
             }
-        } catch (e) {
-            // Keep hardcoded footer
-        }
+        } catch (e) {}
     }
     window.onload = loadFooter;
 </script>
