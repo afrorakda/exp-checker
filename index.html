@@ -50,7 +50,7 @@
             background: var(--input-bg); font-size: 1.2rem; font-weight: 800; color: var(--main) !important;
             outline: none; -webkit-appearance: none; -webkit-text-fill-color: var(--main) !important; opacity: 1 !important;
         }
-        /* プレースホルダーに数字のみの例を追加 */
+        /* 透かしをカンマ区切りに修正 */
         .search-box::placeholder { color: #bbb; -webkit-text-fill-color: #bbb; font-weight: 700; font-size: 1rem; }
 
         .clear-btn {
@@ -116,7 +116,7 @@
     <p class="subtitle">Caution: Shortest remaining time is priority.</p>
 
     <div class="search-container">
-        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 120526 or 12/05/26" oninput="handleInput()" autofocus>
+        <input type="text" class="search-box" id="dateInput" placeholder="120526, 12/05/26" oninput="handleInput()" autofocus>
         <button class="clear-btn" id="clearBtn" onclick="clearInput()">×</button>
     </div>
 
@@ -161,9 +161,7 @@
         let nums = val.match(/\d+/g);
         if (nums && nums.length === 1) {
             const r = nums[0];
-            // 6桁: 120526
             if (r.length === 6) nums = [r.substring(0, 2), r.substring(2, 4), r.substring(4, 6)];
-            // 8桁: 20260512
             else if (r.length === 8) {
                 const s1 = [r.substring(0, 2), r.substring(2, 4), r.substring(4, 8)];
                 const s2 = [r.substring(0, 4), r.substring(4, 6), r.substring(6, 8)];
