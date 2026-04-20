@@ -45,7 +45,6 @@
 
         .search-container { position: relative; margin-bottom: 25px; }
         
-        /* 修正：記号が打てるキーボードへの対応 */
         .search-box {
             width: 100%; padding: 18px; padding-right: 65px; border: 2px solid var(--accent); border-radius: var(--radius);
             background: var(--input-bg); font-size: 1.2rem; font-weight: 800; color: var(--main) !important;
@@ -116,7 +115,7 @@
     <p class="subtitle">Caution: Shortest remaining time is priority.</p>
 
     <div class="search-container">
-        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 12/05/26" oninput="handleInput()" autofocus inputmode="decimal">
+        <input type="text" class="search-box" id="dateInput" placeholder="e.g. 12/05/26" oninput="handleInput()" autofocus>
         <button class="clear-btn" id="clearBtn" onclick="clearInput()">×</button>
     </div>
 
